@@ -24,7 +24,6 @@ var successHtml []byte
 
 func rootHandler(w http.ResponseWriter, req *http.Request) {
 	authenticated := false
-	log.Println(req.FormValue("passwd") == password)
 	if _, passwd, _ := req.BasicAuth(); passwd == password {
 		authenticated = true
 	}
@@ -37,7 +36,6 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 			authenticated = true
 		}
 	}
-	log.Println(authenticated)
 
 	if authenticated {
 		t := token.New(secret, time.Now().Add(lifespan))
