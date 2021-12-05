@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"log"
 	"time"
 )
 
@@ -23,7 +24,9 @@ func (t T) computeMac(secret []byte) []byte {
 // String returns the string encoding of the token
 func (t T) String() string {
 	f := new(bytes.Buffer)
-	binary.Write(f, binary.BigEndian, t.expiration)
+	if err := binary.Write(f, binary.BigEndian, t.expiration.Unix()); err != nil {
+		log.Fatal(err)
+	}
 	f.Write(t.mac)
 	return base64.StdEncoding.EncodeToString(f.Bytes())
 }
@@ -55,8 +58,12 @@ func Parse(b []byte) (T, error) {
 		mac: make([]byte, sha256.Size),
 	}
 	f := bytes.NewReader(b)
-	if err := binary.Read(f, binary.BigEndian, &t.expiration); err != nil {
-		return t, err
+	{
+		var sec int64
+		if err := binary.Read(f, binary.BigEndian, &sec); err != nil {
+			return t, err
+		}
+		t.expiration = time.Unix(sec, 0)
 	}
 	if n, err := f.Read(t.mac); err != nil {
 		return t, err
