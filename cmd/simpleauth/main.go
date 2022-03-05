@@ -37,11 +37,19 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+  // Log the request
+  clientIP := req.Header.Get("X-Real-IP")
+  if clientIP == "" {
+    clientIP = req.RemoteAddr
+  }
+  log.Println(clientIP, req.Method, req.URL, "authenticated:", authenticated)
+
 	if authenticated {
 		t := token.New(secret, time.Now().Add(lifespan))
 		http.SetCookie(w, &http.Cookie{
 			Name:     CookieName,
 			Value:    t.String(),
+      Path:     "/",
 			Secure:   true,
 			SameSite: http.SameSiteStrictMode,
 		})
@@ -112,6 +120,6 @@ func main() {
 
 	http.HandleFunc("/", rootHandler)
 
-	fmt.Println("I am listening on ", *listen)
+	fmt.Println("listening on", *listen)
 	log.Fatal(http.ListenAndServe(*listen, nil))
 }

@@ -1,4 +1,4 @@
-FROM golang:1
+FROM golang:1-alpine AS builder
 
 WORKDIR /go/src/app
 COPY . .
@@ -6,4 +6,7 @@ COPY . .
 RUN go get -d -v ./...
 RUN go install -v ./...
 
-CMD ["simpleauth"]
+FROM alpine
+COPY --from=builder /go/bin/simpleauth /bin
+COPY --from=builder /go/src/app/static /static
+CMD ["/bin/simpleauth"]
