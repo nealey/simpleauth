@@ -36,8 +36,10 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 	if cookie, err := req.Cookie(CookieName); err == nil {
 		t, _ := token.ParseString(cookie.Value)
 		if t.Valid(secret) {
-			authenticated = true
-      mechanism = "Cookie"
+      // Bypass logging and cookie setting:
+      // otherwise there is a torrent of logs
+		  w.Write(successHtml)
+      return
 		}
 	}
 
