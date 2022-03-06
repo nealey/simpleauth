@@ -23,17 +23,21 @@ var loginHtml []byte
 var successHtml []byte
 
 func rootHandler(w http.ResponseWriter, req *http.Request) {
+  mechanism := "unauthenticated"
 	authenticated := false
 	if _, passwd, _ := req.BasicAuth(); passwd == password {
 		authenticated = true
+    mechanism = "HTTP-Basic"
 	}
 	if req.FormValue("passwd") == password {
 		authenticated = true
+    mechanism = "Form"
 	}
 	if cookie, err := req.Cookie(CookieName); err == nil {
 		t, _ := token.ParseString(cookie.Value)
 		if t.Valid(secret) {
 			authenticated = true
+      mechanism = "Cookie"
 		}
 	}
 
@@ -42,7 +46,7 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
   if clientIP == "" {
     clientIP = req.RemoteAddr
   }
-  log.Println(clientIP, req.Method, req.URL, "authenticated:", authenticated)
+  log.Printf("%s %s %s [%s]", clientIP, req.Method, req.URL, mechanism)
 
 	if authenticated {
 		t := token.New(secret, time.Now().Add(lifespan))

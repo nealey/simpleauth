@@ -10,6 +10,8 @@ This checks those boxes.
 
 ## Installation with Traefik
 
+You need to have traefik forward the Path `/` to this application.
+
 I only use docker swarm. You'd do something like the following:
 
 ```yaml
