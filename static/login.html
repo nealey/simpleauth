@@ -8,10 +8,8 @@
       html {
         font-family: sans-serif;
         color: white;
-        background: seagreen linear-gradient(315deg, rgba(255,255,255,0.4), transparent); 
-      }
-      body {
-        height: 100vh;
+        background: seagreen linear-gradient(315deg, rgba(255,255,255,0.2), transparent); 
+        height: 100%;
       }
       div {
         margin: 1em;
@@ -36,7 +34,7 @@
           error(req.statusText || "Authentication failed")
           return
         }
-        window.location = window.location
+        location.reload(true)
       }
       function init() {
         document.querySelector("form").addEventListener("submit", login)
