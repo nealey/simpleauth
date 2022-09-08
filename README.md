@@ -5,8 +5,22 @@ Upon successful login, the browser gets a cookie,
 and further attempts to access will get the success page.
 
 I made this to use with the Traefik forward-auth middleware.
+I now use Caddy: it works with that too.
 All I need is a simple password, that's easy to fill with a password manager.
 This checks those boxes.
+
+
+## Format of the `passwd` file
+
+It's just like `/etc/shadow`.
+
+    username:crypted-password
+
+We use sha256,
+until there's a Go library that supports everything.
+
+There's a program included called `crypt` that will output lines for this file.
+
 
 ## Installation with Traefik
 

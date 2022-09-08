@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GehirnInc/crypt"
+	_ "github.com/GehirnInc/crypt/sha256_crypt"
 	"github.com/nealey/simpleauth/pkg/token"
 )
 
@@ -18,51 +21,68 @@ const CookieName = "auth"
 
 var secret []byte = make([]byte, 256)
 var lifespan time.Duration
-var password string
+var cryptedPasswords map[string]string
 var loginHtml []byte
 var successHtml []byte
 
+func authenticationValid(username, password string) bool {
+	c := crypt.SHA256.New()
+	fmt.Println("checking", username, password)
+	if crypted, ok := cryptedPasswords[username]; ok {
+		fmt.Println(username, password, crypted)
+		if err := c.Verify(crypted, []byte(password)); err == nil {
+			return true
+		} else {
+			log.Println(err)
+		}
+	}
+	return false
+}
+
 func rootHandler(w http.ResponseWriter, req *http.Request) {
-  mechanism := "unauthenticated"
-	authenticated := false
-	if _, passwd, _ := req.BasicAuth(); passwd == password {
-		authenticated = true
-    mechanism = "HTTP-Basic"
-	}
-	if req.FormValue("passwd") == password {
-		authenticated = true
-    mechanism = "Form"
-	}
 	if cookie, err := req.Cookie(CookieName); err == nil {
 		t, _ := token.ParseString(cookie.Value)
 		if t.Valid(secret) {
-      // Bypass logging and cookie setting:
-      // otherwise there is a torrent of logs
-		  w.Write(successHtml)
-      return
+			// Bypass logging and cookie setting:
+			// otherwise there is a torrent of logs
+			w.Write(successHtml)
+			return
 		}
 	}
 
-  // Log the request
-  clientIP := req.Header.Get("X-Real-IP")
-  if clientIP == "" {
-    clientIP = req.RemoteAddr
-  }
-  log.Printf("%s %s %s [%s]", clientIP, req.Method, req.URL, mechanism)
+	authenticated := ""
 
-	if authenticated {
+	if username, password, ok := req.BasicAuth(); ok {
+		if authenticationValid(username, password) {
+			authenticated = "HTTP-Basic"
+		}
+	}
+
+	if authenticationValid(req.FormValue("username"), req.FormValue("password")) {
+		authenticated = "Form"
+	}
+
+	// Log the request
+	clientIP := req.Header.Get("X-Real-IP")
+	if clientIP == "" {
+		clientIP = req.RemoteAddr
+	}
+	log.Printf("%s %s %s [%s]", clientIP, req.Method, req.URL, authenticated)
+
+	if authenticated == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write(loginHtml)
+	} else {
 		t := token.New(secret, time.Now().Add(lifespan))
 		http.SetCookie(w, &http.Cookie{
 			Name:     CookieName,
 			Value:    t.String(),
-      Path:     "/",
+			Path:     "/",
 			Secure:   true,
 			SameSite: http.SameSiteStrictMode,
 		})
+		w.WriteHeader(http.StatusOK)
 		w.Write(successHtml)
-	} else {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write(loginHtml)
 	}
 }
 
@@ -80,8 +100,8 @@ func main() {
 	)
 	passwordPath := flag.String(
 		"passwd",
-		"/run/secrets/password",
-		"Path to a file containing the password",
+		"/run/secrets/passwd",
+		"Path to a file containing passwords",
 	)
 	secretPath := flag.String(
 		"secret",
@@ -95,11 +115,25 @@ func main() {
 	)
 	flag.Parse()
 
-	passwordBytes, err := ioutil.ReadFile(*passwordPath)
-	if err != nil {
+	cryptedPasswords = make(map[string]string, 10)
+	if f, err := os.Open(*passwordPath); err != nil {
 		log.Fatal(err)
+	} else {
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := scanner.Text()
+			parts := strings.Split(line, ":")
+			if len(parts) >= 2 {
+				username := parts[0]
+				password := parts[1]
+				fmt.Println(username, password)
+				cryptedPasswords[username] = password
+			}
+		}
 	}
-	password = strings.TrimSpace(string(passwordBytes))
+
+	var err error
 
 	loginHtml, err = ioutil.ReadFile(path.Join(*htmlPath, "login.html"))
 	if err != nil {
@@ -117,8 +151,8 @@ func main() {
 	}
 	defer f.Close()
 	l, err := f.Read(secret)
-	if l == 0 {
-		log.Fatal("Secret file provided 0 bytes. That's not enough bytes!")
+	if l < 8 {
+		log.Fatalf("Secret file provided %d bytes. That's not enough bytes!", l)
 	} else if err != nil {
 		log.Fatal(err)
 	}
