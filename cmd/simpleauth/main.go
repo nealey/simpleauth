@@ -27,13 +27,9 @@ var successHtml []byte
 
 func authenticationValid(username, password string) bool {
 	c := crypt.SHA256.New()
-	fmt.Println("checking", username, password)
 	if crypted, ok := cryptedPasswords[username]; ok {
-		fmt.Println(username, password, crypted)
 		if err := c.Verify(crypted, []byte(password)); err == nil {
 			return true
-		} else {
-			log.Println(err)
 		}
 	}
 	return false
@@ -127,7 +123,6 @@ func main() {
 			if len(parts) >= 2 {
 				username := parts[0]
 				password := parts[1]
-				fmt.Println(username, password)
 				cryptedPasswords[username] = password
 			}
 		}

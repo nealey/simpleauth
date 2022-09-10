@@ -25,9 +25,16 @@
 
       async function login(evt) {
         evt.preventDefault()
+        let data = new FormData(evt.target)
+        let username = data.get("username")
+        let password = data.get("password")
+
+        let headers = new Headers({
+          "Authorization": "Basic " + btoa(username + ":" + password),
+        })
         let req = await fetch(evt.target.action, {
-          method: evt.target.method,
-          body: new FormData(evt.target),
+          method: "GET",
+          headers: headers,
           credentials: "same-origin",
         })
         if (! req.ok) {
