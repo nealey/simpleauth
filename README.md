@@ -73,9 +73,12 @@ The token is an HMAC digest of an expiration timestamp,
 plus the timestamp.
 When the HMAC is good, and the timestamp is in the future,
 the token is a valid authentication.
-This technique means there is no persistent server storage,
-but also means that if the server restarts,
-everybody has to log in again.
+This technique means there is no persistent server storage.
+
+If you use the default of pulling the session secret from the OS PRNG,
+then everybody will have to log in again every time the server restarts.
+You can use the `-secret` argument to provide a persistent secret,
+so this won't happen.
 
 Some things,
 like WebDAV,

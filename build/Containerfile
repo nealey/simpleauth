@@ -9,4 +9,4 @@ RUN go install -v ./...
 FROM alpine
 COPY --from=builder /go/bin/simpleauth /bin
 COPY --from=builder /go/src/app/static /static
-CMD ["/bin/simpleauth"]
+ENTRYPOINT ["/bin/simpleauth"]
