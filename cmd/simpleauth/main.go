@@ -17,23 +17,18 @@ import (
 	"github.com/nealey/simpleauth/pkg/token"
 )
 
-const CookieName = "auth"
+const CookieName = "simpleauth-token"
 
 var secret []byte = make([]byte, 256)
 var lifespan time.Duration
 var cryptedPasswords map[string]string
 var loginHtml []byte
-var successHtml []byte
 
 func authenticationValid(username, password string) bool {
 	c := crypt.SHA256.New()
-	fmt.Println("checking", username, password)
 	if crypted, ok := cryptedPasswords[username]; ok {
-		fmt.Println(username, password, crypted)
 		if err := c.Verify(crypted, []byte(password)); err == nil {
 			return true
-		} else {
-			log.Println(err)
 		}
 	}
 	return false
@@ -43,23 +38,19 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 	if cookie, err := req.Cookie(CookieName); err == nil {
 		t, _ := token.ParseString(cookie.Value)
 		if t.Valid(secret) {
-			// Bypass logging and cookie setting:
-			// otherwise there is a torrent of logs
-			w.Write(successHtml)
+			fmt.Print(w, "Valid token")
 			return
 		}
 	}
 
-	authenticated := ""
-
-	if username, password, ok := req.BasicAuth(); ok {
-		if authenticationValid(username, password) {
-			authenticated = "HTTP-Basic"
-		}
+	acceptsHtml := false
+	if strings.Contains(req.Header.Get("Accept"), "text/html") {
+		acceptsHtml = true
 	}
 
-	if authenticationValid(req.FormValue("username"), req.FormValue("password")) {
-		authenticated = "Form"
+	authenticated := false
+	if username, password, ok := req.BasicAuth(); ok {
+		authenticated = authenticationValid(username, password)
 	}
 
 	// Log the request
@@ -67,23 +58,40 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 	if clientIP == "" {
 		clientIP = req.RemoteAddr
 	}
-	log.Printf("%s %s %s [%s]", clientIP, req.Method, req.URL, authenticated)
+	log.Printf("%s %s %s [auth:%v]", clientIP, req.Method, req.URL, authenticated)
 
-	if authenticated == "" {
+	if !authenticated {
+		w.Header().Set("Content-Type", "text/html")
+		if !acceptsHtml {
+			w.Header().Set("WWW-Authenticate", "Basic realm=\"simpleauth\"")
+		}
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write(loginHtml)
-	} else {
-		t := token.New(secret, time.Now().Add(lifespan))
-		http.SetCookie(w, &http.Cookie{
-			Name:     CookieName,
-			Value:    t.String(),
-			Path:     "/",
-			Secure:   true,
-			SameSite: http.SameSiteStrictMode,
-		})
-		w.WriteHeader(http.StatusOK)
-		w.Write(successHtml)
+		return
 	}
+
+	// Set Cookie
+	t := token.New(secret, time.Now().Add(lifespan))
+	http.SetCookie(w, &http.Cookie{
+		Name:     CookieName,
+		Value:    t.String(),
+		Path:     "/",
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	// Set cookie value in our fancypants header
+	w.Header().Set("X-Simpleauth-Token", t.String())
+
+	if req.Header.Get("X-Simpleauth-Login") != "" {
+		// Caddy treats any response <300 as "please serve original content",
+		// so we'll use 302 (Found).
+		// According to RFC9110, the server SHOULD send a Location header with 302.
+		// We don't do that, because we don't know where to send you.
+		// It's possible 300 is a less incorrect code to use here.
+		w.WriteHeader(http.StatusFound)
+	}
+	fmt.Fprintln(w, "Authenticated")
 }
 
 func main() {
@@ -127,7 +135,6 @@ func main() {
 			if len(parts) >= 2 {
 				username := parts[0]
 				password := parts[1]
-				fmt.Println(username, password)
 				cryptedPasswords[username] = password
 			}
 		}
@@ -136,10 +143,6 @@ func main() {
 	var err error
 
 	loginHtml, err = ioutil.ReadFile(path.Join(*htmlPath, "login.html"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	successHtml, err = ioutil.ReadFile(path.Join(*htmlPath, "success.html"))
 	if err != nil {
 		log.Fatal(err)
 	}

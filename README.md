@@ -9,7 +9,6 @@ I now use Caddy: it works with that too.
 All I need is a simple password, that's easy to fill with a password manager.
 This checks those boxes.
 
-
 ## Format of the `passwd` file
 
 It's just like `/etc/shadow`.
@@ -22,11 +21,25 @@ until there's a Go library that supports everything.
 There's a program included called `crypt` that will output lines for this file.
 
 
+## Installation with Caddy
+
+Run simpleauth as a service.
+Make sure it can read your `passwd` file,
+which you set up in the previous section.
+
+You'll want a section like this in your Caddyfile:
+
+```
+forward_auth simpleauth:8080 {
+  uri /
+  copy_headers X-Simpleauth-Token
+}
+```
+
 ## Installation with Traefik
 
-You need to have traefik forward the Path `/` to this application.
-
-I only use docker swarm. You'd do something like the following:
+I don't use Traefik any longer, but when I did,
+I had it set up like this:
 
 ```yaml
 services:
@@ -53,10 +66,20 @@ secrets:
     name: password-v1
 ```
 
-## Note
+# How It Works
 
-For some reason that I haven't bothered looking into,
-I have to first load `/` in the browser.
-I think it has something to do with cookies going through traefik simpleauth,
-and I could probably fix it with some JavaScript,
-but this is good enough for me.
+Simpleauth uses a token cookie, in addition to HTTP Basic authentication.
+The token is an HMAC digest of an expiration timestamp,
+plus the timestamp.
+When the HMAC is good, and the timestamp is in the future,
+the token is a valid authentication.
+This technique means there is no persistent server storage,
+but also means that if the server restarts,
+everybody has to log in again.
+
+Some things,
+like WebDAV,
+will only ever use HTTP Basic auth.
+That's okay:
+Simpleauth will issue a new token for every request,
+and the client will ignore it.

@@ -3,7 +3,6 @@
   <head>
     <title>Login</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" href="data:,">
     <style>
       html {
         font-family: sans-serif;
@@ -20,32 +19,48 @@
     </style>
     <script>
       function error(msg) {
-        document.querySelector("#error").textContent = msg
-      }
+          document.querySelector("#error").textContent = msg
+        }
 
       async function login(evt) {
-        evt.preventDefault()
-        let req = await fetch(evt.target.action, {
-          method: evt.target.method,
-          body: new FormData(evt.target),
-          credentials: "same-origin",
-        })
-        if (! req.ok) {
-          error(req.statusText || "Authentication failed")
-          return
-        }
-        location.reload(true)
+          evt.preventDefault()
+          let data = new FormData(evt.target)
+          let username = data.get("username")
+          let password = data.get("password")
+
+          url = new URL(evt.target.action)
+          url.username = ""
+          url.password = ""
+
+          let headers = new Headers({
+              "Authorization": "Basic " + btoa(username + ":" + password),
+              "X-Simpleauth-Login": "true",
+          })
+          let req = await fetch(url, {
+              method: "GET",
+              headers: headers,
+              credentials: "same-origin",
+          })
+          let token = req.headers.get("X-Simpleauth-Token")
+          if (token) {
+            // Set a cookie, just in case
+            document.cookie = `simpleauth-token=${token}; path=/; Secure; SameSite=Strict`
+            location.reload(true)
+          } else {
+            error(req.statusText || "Authentication failed")
+          }
       }
-      function init() {
-        document.querySelector("form").addEventListener("submit", login)
+
+      async function init() {
+          document.querySelector("form").addEventListener("submit", login)
       }
 
       window.addEventListener("load", init)
     </script>
   </head>
   <body>
-    <h1>Log In</h1>
-    <form action="/" method="post">
+    <h1>Login</h1>
+    <form>
       <div>Username: <input type="text" autocomplete="username" name="username"></div>
       <div>Password: <input type="password" autocomplete="current-password" name="password"></div>
       <div><input type="submit" value="Log In"></div>
