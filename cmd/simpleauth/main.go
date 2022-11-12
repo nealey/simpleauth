@@ -14,7 +14,7 @@ import (
 
 	"github.com/GehirnInc/crypt"
 	_ "github.com/GehirnInc/crypt/sha256_crypt"
-	"github.com/nealey/simpleauth/pkg/token"
+	"git.woozle.org/neale/simpleauth/pkg/token"
 )
 
 const CookieName = "simpleauth-token"
@@ -118,7 +118,7 @@ func main() {
 	)
 	htmlPath := flag.String(
 		"html",
-		"static",
+		"web",
 		"Path to HTML files",
 	)
 	flag.Parse()

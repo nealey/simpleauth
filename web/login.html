@@ -41,14 +41,19 @@
               headers: headers,
               credentials: "same-origin",
           })
-          let token = req.headers.get("X-Simpleauth-Token")
-          if (token) {
-            // Set a cookie, just in case
-            document.cookie = `simpleauth-token=${token}; path=/; Secure; SameSite=Strict`
-            location.reload(true)
-          } else {
-            error(req.statusText || "Authentication failed")
+          if (req.status != 401) {
+            let token = req.headers.get("X-Simpleauth-Token")
+            if (token) {
+              // Set a cookie, just in case
+              let expiration = new Date()
+              expiration.setFullYear(expiration.getFullYear() + 1)
+              document.cookie = `simpleauth-token=${token}; expires=${expiration.toUTCString()}; path=/; Secure; SameSite=Strict`
+            }
+            location.reload()
+            return
           }
+          console.log(req.headers)
+          error(req.statusText || "Authentication failed")
       }
 
       async function init() {
