@@ -1,3 +1,6 @@
+The canonical home for this project is
+https://git.woozle.org/neale/simpleauth
+
 # Simple Auth
 
 All this does is present a login page.
