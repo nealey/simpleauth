@@ -113,7 +113,7 @@ func main() {
 	)
 	secretPath := flag.String(
 		"secret",
-		"/dev/urandom",
+		"/run/secrets/simpleauth.key",
 		"Path to a file containing some sort of secret, for signing requests",
 	)
 	htmlPath := flag.String(

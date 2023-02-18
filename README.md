@@ -57,6 +57,7 @@ services:
     image: ghcr.io/nealey/simpleauth
     secrets:
       - password
+      - simpleauth.key
     deploy:
       labels:
         traefik.enable: "true"
@@ -78,10 +79,8 @@ When the HMAC is good, and the timestamp is in the future,
 the token is a valid authentication.
 This technique means there is no persistent server storage.
 
-If you use the default of pulling the session secret from the OS PRNG,
-then everybody will have to log in again every time the server restarts.
-You can use the `-secret` argument to provide a persistent secret,
-so this won't happen.
+If you don't want keys to persist across service invocations / reboots,
+you can pass in `-secret /dev/urandom`.
 
 Some things,
 like WebDAV,
