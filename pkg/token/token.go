@@ -5,38 +5,47 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/binary"
+	"encoding/gob"
 	"log"
 	"time"
 )
 
 type T struct {
-	expiration time.Time
-	mac        []byte
+	Expiration time.Time
+	Username   string
+	Mac        []byte
 }
 
 func (t T) computeMac(secret []byte) []byte {
+	zt := t
+	zt.Mac = nil
+
 	mac := hmac.New(sha256.New, secret)
-	binary.Write(mac, binary.BigEndian, t.expiration)
+	mac.Write(zt.Bytes())
 	return mac.Sum([]byte{})
 }
 
-// String returns the string encoding of the token
-func (t T) String() string {
+// Bytes encodes the token
+func (t T) Bytes() []byte {
 	f := new(bytes.Buffer)
-	if err := binary.Write(f, binary.BigEndian, t.expiration.Unix()); err != nil {
+	enc := gob.NewEncoder(f)
+	if err := enc.Encode(t); err != nil {
 		log.Fatal(err)
 	}
-	f.Write(t.mac)
-	return base64.StdEncoding.EncodeToString(f.Bytes())
+	return f.Bytes()
+}
+
+// String returns the ASCII string encoding of the token
+func (t T) String() string {
+	return base64.StdEncoding.EncodeToString(t.Bytes())
 }
 
 // Valid returns true iff the token is valid for the given secret and current time
 func (t T) Valid(secret []byte) bool {
-	if time.Now().After(t.expiration) {
+	if time.Now().After(t.Expiration) {
 		return false
 	}
-	if !hmac.Equal(t.mac, t.computeMac(secret)) {
+	if !hmac.Equal(t.Mac, t.computeMac(secret)) {
 		return false
 	}
 
@@ -44,36 +53,25 @@ func (t T) Valid(secret []byte) bool {
 }
 
 // New returns a new token
-func New(secret []byte, expiration time.Time) T {
+func New(secret []byte, username string, expiration time.Time) T {
 	t := T{
-		expiration: expiration,
+		Username:   username,
+		Expiration: expiration,
 	}
-	t.mac = t.computeMac(secret)
+	t.Mac = t.computeMac(secret)
 	return t
 }
 
 // Parse returns a new token from the given bytes
 func Parse(b []byte) (T, error) {
-	t := T{
-		mac: make([]byte, sha256.Size),
-	}
+	var t T
 	f := bytes.NewReader(b)
-	{
-		var sec int64
-		if err := binary.Read(f, binary.BigEndian, &sec); err != nil {
-			return t, err
-		}
-		t.expiration = time.Unix(sec, 0)
-	}
-	if n, err := f.Read(t.mac); err != nil {
-		return t, err
-	} else {
-		t.mac = t.mac[:n]
-	}
-	return t, nil
+	dec := gob.NewDecoder(f)
+	err := dec.Decode(&t)
+	return t, err
 }
 
-// ParseString parses a base64-encoded string, as created by T.String()
+// ParseString parses an ASCII-encoded string, as created by T.String()
 func ParseString(s string) (T, error) {
 	b, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
