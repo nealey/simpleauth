@@ -24,3 +24,14 @@ func TestToken(t *testing.T) {
 		t.Error("Decoded username wrong")
 	}
 }
+
+func TestExpired(t *testing.T) {
+	secret := []byte("bloop")
+	username := "rodney"
+	token := New(secret, username, time.Now().Add(-10*time.Second))
+
+  if token.Valid(secret) {
+    t.Error("Expired token still valid")
+  }
+}
+
