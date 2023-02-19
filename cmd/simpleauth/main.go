@@ -64,7 +64,7 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 		status = "succeeded"
 		w.Header().Set("X-Simpleauth-Username", username)
 
-    if !login {
+		if !login {
 			// This is the only time simpleauth returns 200
 			// That will cause Caddy to proceed with the original request
 			http.Error(w, "Success", http.StatusOK)

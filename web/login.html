@@ -21,6 +21,9 @@
       function error(msg) {
         document.querySelector("#error").textContent = msg
       }
+      function message(msg) {
+        document.querySelector("#message").textContent = msg
+      }
 
       async function login(evt) {
         evt.preventDefault()
@@ -51,7 +54,7 @@
           }
           document.cookie = cookieStr // JavaScript butt-magic!
           location.reload()
-          error("Success - your page should reload now")
+          message("Logged In!")
           return
         }
         error(req.statusText || "Authentication failed")
@@ -72,5 +75,6 @@
       <div><input type="submit" value="Log In"></div>
     </form>
     <div id="error"></div>
+    <div id="message"></div>
   </body>
 </html>
