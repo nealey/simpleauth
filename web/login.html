@@ -51,8 +51,9 @@
           }
           document.cookie = cookieStr // JavaScript butt-magic!
           location.reload()
+          error("Success - your page should reload now")
+          return
         }
-        console.log(req.headers)
         error(req.statusText || "Authentication failed")
       }
 

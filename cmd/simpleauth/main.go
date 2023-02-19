@@ -55,13 +55,16 @@ func usernameIfAuthenticated(req *http.Request) string {
 func rootHandler(w http.ResponseWriter, req *http.Request) {
 	var status string
 	username := usernameIfAuthenticated(req)
+	login := req.Header.Get("X-Simpleauth-Login") == "true"
+	browser := strings.Contains(req.Header.Get("Accept"), "text/html")
+
 	if username == "" {
 		status = "failed"
 	} else {
 		status = "succeeded"
 		w.Header().Set("X-Simpleauth-Username", username)
 
-		if req.Header.Get("X-Simpleauth-Login") != "true" {
+    if !login {
 			// This is the only time simpleauth returns 200
 			// That will cause Caddy to proceed with the original request
 			http.Error(w, "Success", http.StatusOK)
@@ -86,7 +89,7 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	w.Header().Set("X-Simpleauth-Authentication", status)
 	w.Header().Set("WWW-Authenticate", "Simpleauth-Login")
-	if !strings.Contains(req.Header.Get("Accept"), "text/html") {
+	if !login && !browser {
 		// Make browsers use our login form instead of basic auth
 		w.Header().Add("WWW-Authenticate", "Basic realm=\"simpleauth\"")
 	}

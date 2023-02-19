@@ -1,90 +1,132 @@
-The canonical home for this project is
-https://git.woozle.org/neale/simpleauth
-
 # Simple Auth
 
-All this does is present a login page.
-Upon successful login, the browser gets a cookie,
-and further attempts to access will get the success page.
+This is a stateless forward-auth provider.
+I tested it with Caddy, but it should work fine with Traefik.
 
-I made this to use with the Traefik forward-auth middleware.
-I now use Caddy: it works with that too.
-All I need is a simple password, that's easy to fill with a password manager.
-This checks those boxes.
+# Theory of Operation
 
-## Format of the `passwd` file
+This issues cryptographically signed authentication tokens to the client.
+Some JavaScript stores the token in a cookie.
 
-It's just like `/etc/shadow`.
+When a client presents an authentication token in a cookie,
+they are allowed in if the token was properly signed,
+and has not expired.
 
-    username:crypted-password
+Authentication tokens consist of:
 
-We use sha256,
-until there's a Go library that supports everything.
+* Username
+* Expiration date
+* Hashed Message Authentication Code (HMAC)
 
-There's a program included called `crypt` that will output lines for this file.
+Simpleauth also works with HTTP Basic authentication.
+
+# Setup
+
+Simpleauth needs two (2) files:
+
+* A secret key, to sign authentication tokens
+* A list of usernames and hashed passwords
 
 
-## Installation with Caddy
+## Create secret key
 
-Run simpleauth as a service.
-Make sure it can read your `passwd` file,
-which you set up in the previous section.
+This will use `/dev/urandom` to generate a 64-byte secret key.
 
-You'll want a section like this in your Caddyfile:
+```sh
+SASECRET=/run/secrets/simpleauth.key  # Set to wherever you want your secret to live
+dd if=/dev/urandom of=$SASECRET bs=1 count=64
+```
+
+
+## Create password file
+
+It's just a text file with hashed passwords.
+Each line is of the format `username:password_hash`
+
+```sh
+alias sacrypt="docker run --rm --entrypoint=/crypt git.woozle.org/neale/simpleauth"
+SAPASSWD=/run/secrets/passwd   # Set to wherever you want your password file to live
+: > $SAPASSWD                  # Reset password file
+sacrypt user1 password1 >> $SAPASSWD
+sacrypt user2 password2 >> $SAPASSWD
+sacrypt user3 password3 >> $SAPASSWD
+```
+
+
+## Start it
+
+Turning this into the container orchestration system you prefer
+(Docker Swarm, Kubernetes, Docker Compose)
+is left as an exercise for the reader.
+
+```sh
+docker run \
+  --name=simpleauth \
+  --detach \
+  --restart=always \
+  --port 8080:8080 \
+  --volume $SASECRET:/run/secrets/simpleauth.key:ro \
+  --volume $SAPASSWD:/run/secrets/passwd:ro \
+  git.woozle.org/neale/simpleauth
+```
+
+## Make your web server use it
+
+### Caddy
+
+You'll want a `forward-auth` section like this:
 
 ```
-forward_auth simpleauth:8080 {
-  uri /
-  copy_headers X-Simpleauth-Token
+private.example.com {
+  forward_auth localhost:8080 {
+    uri /
+    copy_headers X-Simpleauth-Username
+    header_down X-Simpleauth-Domain example.com    # Set cookie for all of example.com
+  }
+  respond "Hello, friend!"
 }
 ```
 
-## Installation with Traefik
+The `copy_headers` directive tells Caddy to pass
+Simpleauth's `X-Simpleauth-Username` header
+along in the HTTP request.
+If you are reverse proxying to some other app,
+it can look at this header to determine who's logged in.
 
-I don't use Traefik any longer, but when I did,
-I had it set up like this:
+`header_down` sets the
+`X-Simpleauth-Domain` header in HTTP responses.
+The only time a client would get an HTTP response is when it is not yet authenticated.
+The built-in JavaScript login page uses this header to set the cookie domain:
+this way, you can protect multiple sites within a single cookie
 
-```yaml
-services:
-  my-cool-service:
-    # All your cool stuff here
-    deploy:
-      labels:
-        # Keep all your existing traefik stuff
-        traefik.http.routers.dashboard.middlewares: forward-auth
-        traefik.http.middlewares.forward-auth.forwardauth.address: http://simpleauth:8080/
-  simpleauth:
-    image: ghcr.io/nealey/simpleauth
-    secrets:
-      - password
-      - simpleauth.key
-    deploy:
-      labels:
-        traefik.enable: "true"
-        traefik.http.routers.simpleauth.rules: "PathPrefix(`/`)"
-        traefik.http.services.simpleauth.loadbalancer.server.port: "8080"
+### Traefik
 
-secrets:
-  password:
-    file: password
-    name: password-v1
-```
+I need someone to send me equivalent
+traefik
+configuration,
+to include here.
 
-# How It Works
 
-Simpleauth uses a token cookie, in addition to HTTP Basic authentication.
-The token is an HMAC digest of an expiration timestamp,
-plus the timestamp.
-When the HMAC is good, and the timestamp is in the future,
-the token is a valid authentication.
-This technique means there is no persistent server storage.
+### nginx
 
-If you don't want keys to persist across service invocations / reboots,
-you can pass in `-secret /dev/urandom`.
+I need someone to send me equivalent
+nginx
+configuration,
+to include here.
 
-Some things,
-like WebDAV,
-will only ever use HTTP Basic auth.
-That's okay:
-Simpleauth will issue a new token for every request,
-and the client will ignore it.
+
+# Why not some other thing?
+
+The main reason is that I couldn't get the freedesktop.org
+WebDAV client code to work with anything else I found.
+
+* Authelia - I like it, but I couldn't get WebDAV to work. Also, it used 4.8GB of RAM and wanted a Redis server.
+* Authentik - Didn't try it, looked too complicated.
+* Keycloak - Didn't try it, looked way too complicated.
+
+
+# Project Home
+
+The canonical home for this project is
+https://git.woozle.org/neale/simpleauth
+
