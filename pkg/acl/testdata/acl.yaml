@@ -1,0 +1,22 @@
+groups:
+  - &any [.]
+  - &all
+    - alice
+    - bob
+    - carol
+rules:
+  - url: ^https://example.org/public/
+    action: public
+  - url: ^https://example.com/private/
+    users: *any
+    action: auth
+  - url: ^https://example.com/blargh
+    methods:
+      - BLARGH
+    action: public
+  - url: ^https://example.com/only-alice/
+    users:
+      - alice
+    action: auth
+  - url: ^https://example.com/(?P<user>)/
+    action: auth

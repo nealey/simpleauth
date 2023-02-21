@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -23,6 +24,19 @@ var secret []byte = make([]byte, 256)
 var lifespan time.Duration
 var cryptedPasswords map[string]string
 var loginHtml []byte
+var verbose bool
+
+func debugln(v ...any) {
+	if verbose {
+		log.Println(v...)
+	}
+}
+
+func debugf(fmt string, v ...any) {
+	if verbose {
+		log.Printf(fmt, v...)
+	}
+}
 
 func authenticationValid(username, password string) bool {
 	c := crypt.SHA256.New()
@@ -35,19 +49,32 @@ func authenticationValid(username, password string) bool {
 }
 
 func usernameIfAuthenticated(req *http.Request) string {
-	if cookie, err := req.Cookie(CookieName); err == nil {
-		t, _ := token.ParseString(cookie.Value)
-		if t.Valid(secret) {
-			return t.Username
-		}
-	}
-
-	authUsername, authPassword, ok := req.BasicAuth()
-	if ok {
-		if authenticationValid(authUsername, authPassword) {
+	if authUsername, authPassword, ok := req.BasicAuth(); ok {
+		valid := authenticationValid(authUsername, authPassword)
+		debugf("basic auth valid:%v username:%v", valid, authUsername)
+		if valid {
 			return authUsername
 		}
+	} else {
+    debugf("no basic auth")
+  }
+
+  ncookies := 0
+	for i, cookie := range req.Cookies() {
+		if cookie.Name != CookieName {
+			continue
+		}
+		t, _ := token.ParseString(cookie.Value)
+		valid := t.Valid(secret)
+		debugf("cookie %d valid:%v username:%v", i, valid, t.Username)
+		if valid {
+			return t.Username
+		}
+    ncookies += 1
 	}
+  if ncookies == 0 {
+    debugf("no cookies")
+  }
 
 	return ""
 }
@@ -79,12 +106,23 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 		// which needs these headers to set the cookie and try again.
 	}
 
-	// Log the request
 	clientIP := req.Header.Get("X-Real-IP")
 	if clientIP == "" {
 		clientIP = req.RemoteAddr
 	}
-	log.Println(clientIP, req.Method, req.URL, status, username)
+	forwardedMethod := req.Header.Get("X-Forwarded-Method")
+	forwardedURL := url.URL{
+		Scheme: req.Header.Get("X-Forwarded-Proto"),
+		Host:  req.Header.Get("X-Forwarded-Host"),
+		Path:  req.Header.Get("X-Forwarded-Uri"),
+		User:  url.UserPassword(username, ""),
+	}
+
+	// Log the request
+	log.Printf("%s %s %s login:%v %s",
+		clientIP, forwardedMethod, forwardedURL.String(),
+		login, status,
+	)
 
 	w.Header().Set("Content-Type", "text/html")
 	w.Header().Set("X-Simpleauth-Authentication", status)
@@ -123,6 +161,12 @@ func main() {
 		"html",
 		"web",
 		"Path to HTML files",
+	)
+	flag.BoolVar(
+		&verbose,
+		"verbose",
+		false,
+		"Print verbose logs, for debugging",
 	)
 	flag.Parse()
 

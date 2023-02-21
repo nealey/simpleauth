@@ -30,8 +30,7 @@ func TestExpired(t *testing.T) {
 	username := "rodney"
 	token := New(secret, username, time.Now().Add(-10*time.Second))
 
-  if token.Valid(secret) {
-    t.Error("Expired token still valid")
-  }
+	if token.Valid(secret) {
+		t.Error("Expired token still valid")
+	}
 }
-
