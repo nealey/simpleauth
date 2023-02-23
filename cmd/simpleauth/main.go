@@ -56,10 +56,10 @@ func usernameIfAuthenticated(req *http.Request) string {
 			return authUsername
 		}
 	} else {
-    debugf("no basic auth")
-  }
+		debugf("no basic auth")
+	}
 
-  ncookies := 0
+	ncookies := 0
 	for i, cookie := range req.Cookies() {
 		if cookie.Name != CookieName {
 			continue
@@ -70,11 +70,11 @@ func usernameIfAuthenticated(req *http.Request) string {
 		if valid {
 			return t.Username
 		}
-    ncookies += 1
+		ncookies += 1
 	}
-  if ncookies == 0 {
-    debugf("no cookies")
-  }
+	if ncookies == 0 {
+		debugf("no cookies")
+	}
 
 	return ""
 }
@@ -91,16 +91,17 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 		status = "succeeded"
 		w.Header().Set("X-Simpleauth-Username", username)
 
-		if !login {
+		if login {
+			// Send back a token; this will turn into a cookie
+			t := token.New(secret, username, time.Now().Add(lifespan))
+			w.Header().Set("X-Simpleauth-Cookie", fmt.Sprintf("%s=%s", CookieName, t.String()))
+			w.Header().Set("X-Simpleauth-Token", t.String())
+		} else {
 			// This is the only time simpleauth returns 200
 			// That will cause Caddy to proceed with the original request
 			http.Error(w, "Success", http.StatusOK)
 			return
 		}
-		// Send back a token; this will turn into a cookie
-		t := token.New(secret, username, time.Now().Add(lifespan))
-		w.Header().Set("X-Simpleauth-Cookie", fmt.Sprintf("%s=%s", CookieName, t.String()))
-		w.Header().Set("X-Simpleauth-Token", t.String())
 		// Fall through to the 401 response, though,
 		// so that Caddy will send our response back to the client,
 		// which needs these headers to set the cookie and try again.
@@ -113,16 +114,18 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 	forwardedMethod := req.Header.Get("X-Forwarded-Method")
 	forwardedURL := url.URL{
 		Scheme: req.Header.Get("X-Forwarded-Proto"),
-		Host:  req.Header.Get("X-Forwarded-Host"),
-		Path:  req.Header.Get("X-Forwarded-Uri"),
-		User:  url.UserPassword(username, ""),
+		Host:   req.Header.Get("X-Forwarded-Host"),
+		Path:   req.Header.Get("X-Forwarded-Uri"),
+		User:   url.UserPassword(username, ""),
 	}
 
 	// Log the request
-	log.Printf("%s %s %s login:%v %s",
-		clientIP, forwardedMethod, forwardedURL.String(),
-		login, status,
-	)
+	if false {
+		log.Printf("%s %s %s login:%v %s",
+			clientIP, forwardedMethod, forwardedURL.String(),
+			login, status,
+		)
+	}
 
 	w.Header().Set("Content-Type", "text/html")
 	w.Header().Set("X-Simpleauth-Authentication", status)

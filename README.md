@@ -125,6 +125,10 @@ WebDAV client code to work with anything else I found.
 * Keycloak - Didn't try it, looked way too complicated.
 
 
+# Todo
+
+* [ ] Performance testing: somehow this takes more CPU than caddy?
+
 # Project Home
 
 The canonical home for this project is
