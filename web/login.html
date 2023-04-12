@@ -49,8 +49,10 @@
           let expiration = new Date()
           expiration.setFullYear(expiration.getFullYear() + 1)
           let cookieStr = `${cookie}; expires=${expiration.toUTCString()}; path=/; Secure; SameSite=Strict`
+          document.cookie = "simpleauth-token=; expires=Thu, 01 Jan 1970 00:00:00 GMT" // Clear any old cookies
           if (domain) {
             cookieStr += `; domain=${domain}`
+            document.cookie = `simpleauth-token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; domain=${domain}`
           }
           document.cookie = cookieStr // JavaScript butt-magic!
           location.reload()
